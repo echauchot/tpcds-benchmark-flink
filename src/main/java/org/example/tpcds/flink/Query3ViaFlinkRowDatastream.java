@@ -10,10 +10,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.functions.FilterFunction;
-import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
+import org.apache.flink.api.common.state.MapState;
+import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -26,6 +27,7 @@ import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
 import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
@@ -125,20 +127,19 @@ public class Query3ViaFlinkRowDatastream {
 
     // Join1: WHERE dt.d_date_sk = store_sales.ss_sold_date_sk
     final DataStream<Row> recordsJoinDateSk = dateDim
-      .join(storeSales)
-      .where(row -> (int) row.getField(0))
-      .equalTo(row -> (int) row.getField(0))
-      .window(GlobalWindows.create())
-      .apply((JoinFunction<Row, Row, Row>) Row::join);
+      .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0))
+      .connect(storeSales.keyBy(
+        (KeySelector<Row, Integer>) value -> (Integer) value.getField(0)))
+      .process(new JoinRecords())
+      .returns(Row.class);
 
     // Join2: WHERE store_sales.ss_item_sk = item.i_item_sk
     final DataStream<Row> recordsJoinItemSk = recordsJoinDateSk
-      .join(item)
-      .where(row -> (int) row.getField(4))
-      .equalTo(row -> (int) row.getField(0))
-      .window(GlobalWindows.create())
-      .apply((JoinFunction<Row, Row, Row>) Row::join);
-
+      .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(4))
+      .connect(
+        item.keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0)))
+      .process(new JoinRecords())
+      .returns(Row.class);
 
     // GROUP BY dt.d_year, item.i_brand, item.i_brand_id
     final SingleOutputStreamOperator<Row> sum = recordsJoinItemSk
@@ -269,6 +270,50 @@ public class Query3ViaFlinkRowDatastream {
       int aIBrandId = (int) a.getField(1);
       int bIBrandId = (int) b.getField(1);
       return aIBrandId - bIBrandId;
+    }
+  }
+  private static class JoinRecords
+    extends KeyedCoProcessFunction<Integer, Row, Row, Row> {
+
+    //    The state of Row belonging to dataStream 1
+    private MapState<Integer, Row> state1;
+    //    The state of Row belonging to dataStream 2
+    private MapState<Integer, Row> state2;
+
+    @Override
+    public void open(Configuration parameters) {
+      state1 = getRuntimeContext().getMapState(
+        new MapStateDescriptor<>("rows_dataStream_1", Integer.class, Row.class));
+      state2 = getRuntimeContext().getMapState(
+        new MapStateDescriptor<>("rows_dataStream_2", Integer.class, Row.class));
+    }
+
+    private Row stateJoin(Row currentRow, int currentDatastream, Context context) throws Exception {
+      final Integer currentKey = context.getCurrentKey();
+      MapState<Integer, Row> myState = currentDatastream == 1 ? state1 : state2;
+      MapState<Integer, Row> otherState = currentDatastream == 1 ? state2 : state1;
+      // join with the other datastream by looking into the state of the other datastream
+      final Row otherRow = otherState.get(currentKey);
+      if (otherRow == null) { // did not find a record to join with, store record for later join
+        myState.put(currentKey, currentRow);
+        return null;
+      } else { // found a record to join with (same key), join
+        return currentDatastream == 1 ?
+          Row.join(currentRow, otherRow) :
+          Row.join(otherRow, currentRow);
+      }
+    }
+
+    @Override
+    public void processElement1(Row currentRow, Context context,
+      Collector<Row> collector) throws Exception {
+      collector.collect(stateJoin(currentRow, 1, context));
+    }
+
+    @Override
+    public void processElement2(Row currentRow, Context context,
+      Collector<Row> collector) throws Exception {
+      collector.collect(stateJoin(currentRow, 2, context));
     }
   }
 
