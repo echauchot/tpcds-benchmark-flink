@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{ISO8601} | %-5.5p | %-16.16t | %-32.32c{1} | %m%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Root level="error">
+      <AppenderRef ref="Console"/>
+    </Root>
+    <Logger name="com.talend.tpcds.flink" level="info" additivity="false">
+      <AppenderRef ref="Console"/>
+    </Logger>
+  </Loggers>
+</Configuration>
