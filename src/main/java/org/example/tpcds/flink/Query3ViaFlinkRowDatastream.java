@@ -1,11 +1,14 @@
 package org.example.tpcds.flink;
 
+import static org.example.tpcds.flink.CLIUtils.extractParameters;
+import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
+import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.OrderComparator;
+import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.createInputFormat;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.flink.api.common.RuntimeExecutionMode;
@@ -17,8 +20,6 @@ import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.RowCsvInputFormat;
 import org.apache.flink.configuration.Configuration;
@@ -52,8 +53,6 @@ import org.apache.logging.log4j.Logger;
 public class Query3ViaFlinkRowDatastream {
 
   private static final Logger LOG = LogManager.getLogger(Query3ViaFlinkRowDataset.class);
-  private static final String FIELD_DELIMITER = "|";
-  private static final String ROW_DELIMITER = "\n";
 
   public static void main(String[] args) throws Exception {
     final Map<String, String> parameters = extractParameters(args);
@@ -208,70 +207,6 @@ public class Query3ViaFlinkRowDatastream {
     return row -> String.valueOf(row.getField(1)) + row.getField(8) + row.getField(7);
   }
 
-  private static Map<String, String> extractParameters(String[] args) {
-    Map<String, String> result = new HashMap<>();
-    for (String arg : args) {
-      final String key = arg.split("=")[0];
-      final String value = arg.split("=")[1];
-      result.put(key, value);
-    }
-    return result;
-  }
-
-  private static RowCsvInputFormat createInputFormat(String tableName, String filePath, int[] selectedFields) {
-    TypeInformation[] fieldTypes;
-    switch (tableName) {
-      case "date_dim":
-        fieldTypes = new TypeInformation[] {
-          BasicTypeInfo.INT_TYPE_INFO,
-          BasicTypeInfo.INT_TYPE_INFO,
-          BasicTypeInfo.INT_TYPE_INFO
-        };
-        break;
-      case "store_sales":
-        fieldTypes = new TypeInformation[] {
-          BasicTypeInfo.INT_TYPE_INFO,
-          BasicTypeInfo.INT_TYPE_INFO,
-          BasicTypeInfo.FLOAT_TYPE_INFO
-        };
-        break;
-      case "item":
-        fieldTypes = new TypeInformation[] {
-          BasicTypeInfo.INT_TYPE_INFO,
-          BasicTypeInfo.INT_TYPE_INFO,
-          BasicTypeInfo.STRING_TYPE_INFO,
-          BasicTypeInfo.INT_TYPE_INFO
-        };
-        break;
-      default:
-        throw new IllegalStateException(tableName + " unsupported");
-    }
-    return new RowCsvInputFormat(
-      new Path(filePath), fieldTypes, ROW_DELIMITER, FIELD_DELIMITER, selectedFields);
-  }
-
-  private static class OrderComparator implements Comparator<Row> {
-
-    @Override
-    public int compare(Row a, Row b) {
-      //ORDER BY dt.d_year, sum_agg desc, brand_id
-      int aDYear = (int) a.getField(0);
-      int bDYear = (int) b.getField(0);
-      if (bDYear != aDYear) {
-        return aDYear - bDYear;
-      }
-
-      float aSumAgg = (Float) a.getField(3);
-      float bSumAgg = (Float) b.getField(3);
-      if (bSumAgg != aSumAgg) {
-        return bSumAgg > aSumAgg ? 1 : -1;
-      }
-
-      int aIBrandId = (int) a.getField(1);
-      int bIBrandId = (int) b.getField(1);
-      return aIBrandId - bIBrandId;
-    }
-  }
   private static class JoinRows
     extends KeyedCoProcessFunction<Integer, Row, Row, Row> {
 
