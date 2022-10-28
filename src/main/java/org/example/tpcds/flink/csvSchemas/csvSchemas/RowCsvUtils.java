@@ -1,4 +1,4 @@
-package org.example.tpcds.flink.flink.csvSchemas;
+package org.example.tpcds.flink.csvSchemas.csvSchemas;
 
 import java.util.Comparator;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;

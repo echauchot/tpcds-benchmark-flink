@@ -16,25 +16,28 @@
  * limitations under the License.
  */
 
-package org.example.tpcds.flink.flink.csvSchemas;
+package org.example.tpcds.flink.csvSchemas.csvSchemas;
 
-import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.flink.table.types.DataType;
 
-/** Class to define table schema of TPS-DS table. The schema consists of a {@link org.apache.flink.table.tpcds.schema.Column} List. */
-public class TpcdsSchema {
-    private final List<Column> columns;
+/**
+ * Class to define column schema of TPS-DS table. The Column schema consists of field name {@link
+ * String} and field type {@link DataType}.
+ */
+public class Column {
+    private final String name;
+    private final DataType dataType;
 
-    public TpcdsSchema(List<Column> columns) {
-        this.columns = columns;
+    public Column(String name, DataType dataType) {
+        this.name = name;
+        this.dataType = dataType;
     }
 
-    public List<String> getFieldNames() {
-        return columns.stream().map(column -> column.getName()).collect(Collectors.toList());
+    public String getName() {
+        return name;
     }
 
-    public List<DataType> getFieldTypes() {
-        return columns.stream().map(column -> column.getDataType()).collect(Collectors.toList());
+    public DataType getDataType() {
+        return dataType;
     }
 }

@@ -1,9 +1,9 @@
 package org.example.tpcds.flink;
 
 import static org.example.tpcds.flink.CLIUtils.extractParameters;
-import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
-import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.OrderComparator;
-import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.createInputFormat;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.OrderComparator;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
 
 import java.util.ArrayList;
 import java.util.List;

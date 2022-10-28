@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example.tpcds.flink.flink.csvSchemas;
+package org.example.tpcds.flink.csvSchemas.csvSchemas;
 
 import java.sql.Date;
 import java.util.Arrays;

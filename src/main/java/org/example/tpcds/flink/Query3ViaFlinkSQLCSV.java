@@ -28,8 +28,8 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.sinks.CsvTableSink;
 import org.apache.flink.table.sources.CsvTableSource;
 import org.apache.flink.table.types.utils.TypeConversions;
-import org.example.tpcds.flink.flink.csvSchemas.TpcdsSchema;
-import org.example.tpcds.flink.flink.csvSchemas.TpcdsSchemaProvider;
+import org.example.tpcds.flink.csvSchemas.csvSchemas.TpcdsSchema;
+import org.example.tpcds.flink.csvSchemas.csvSchemas.TpcdsSchemaProvider;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

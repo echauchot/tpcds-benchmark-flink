@@ -1,9 +1,9 @@
 package org.example.tpcds.flink;
 
 import static org.example.tpcds.flink.CLIUtils.extractParameters;
-import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
-import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.OrderComparator;
-import static org.example.tpcds.flink.flink.csvSchemas.RowCsvUtils.createInputFormat;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.OrderComparator;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -140,9 +140,8 @@ public class Query3ViaFlinkRowDatastream {
       .process(new JoinRows())
       .returns(Row.class);
 
-    // GROUP BY dt.d_year, item.i_brand, item.i_brand_id
-    final SingleOutputStreamOperator<Row> sum =
-        recordsJoinItemSk
+    // GROUP BY date_dim.d_year, item.i_brand, item.i_brand_id
+    final DataStream<Row> sum = recordsJoinItemSk
             .keyBy(compositeKey())
             // SUM(ss_ext_sales_price) sum_agg
             .reduce(
@@ -178,8 +177,7 @@ public class Query3ViaFlinkRowDatastream {
       .windowAll(GlobalWindows.create())
       .process(new ProcessAllWindowFunction<Row, Row, GlobalWindow>() {
 
-        @Override public void process(
-          ProcessAllWindowFunction<Row, Row, GlobalWindow>.Context context, Iterable<Row> rows,
+        @Override public void process(Context context, Iterable<Row> rows,
           Collector<Row> collector) {
           List<Row> output = new ArrayList<>();
           rows.forEach(output::add);
