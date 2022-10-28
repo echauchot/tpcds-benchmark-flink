@@ -130,7 +130,7 @@ public class Query3ViaFlinkRowDatastream {
       .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0))
       .connect(storeSales.keyBy(
         (KeySelector<Row, Integer>) value -> (Integer) value.getField(0)))
-      .process(new JoinRecords())
+      .process(new JoinRows())
       .returns(Row.class);
 
     // Join2: WHERE store_sales.ss_item_sk = item.i_item_sk
@@ -138,7 +138,7 @@ public class Query3ViaFlinkRowDatastream {
       .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(4))
       .connect(
         item.keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0)))
-      .process(new JoinRecords())
+      .process(new JoinRows())
       .returns(Row.class);
 
     // GROUP BY dt.d_year, item.i_brand, item.i_brand_id
@@ -272,7 +272,7 @@ public class Query3ViaFlinkRowDatastream {
       return aIBrandId - bIBrandId;
     }
   }
-  private static class JoinRecords
+  private static class JoinRows
     extends KeyedCoProcessFunction<Integer, Row, Row, Row> {
 
     //    The state of Row belonging to dataStream 1
@@ -294,10 +294,10 @@ public class Query3ViaFlinkRowDatastream {
       MapState<Integer, Row> otherState = currentDatastream == 1 ? state2 : state1;
       // join with the other datastream by looking into the state of the other datastream
       final Row otherRow = otherState.get(currentKey);
-      if (otherRow == null) { // did not find a record to join with, store record for later join
+      if (otherRow == null) { // did not find a row to join with, store the row for later join
         myState.put(currentKey, currentRow);
         return null;
-      } else { // found a record to join with (same key), join
+      } else { // found a row to join with (same key) so do the join
         return currentDatastream == 1 ?
           Row.join(currentRow, otherRow) :
           Row.join(otherRow, currentRow);
@@ -305,15 +305,21 @@ public class Query3ViaFlinkRowDatastream {
     }
 
     @Override
-    public void processElement1(Row currentRow, Context context,
-      Collector<Row> collector) throws Exception {
-      collector.collect(stateJoin(currentRow, 1, context));
+    public void processElement1(Row currentRow, Context context, Collector<Row> collector)
+        throws Exception {
+      final Row jointRow = stateJoin(currentRow, 1, context);
+      if (jointRow != null) {
+        collector.collect(jointRow);
+      }
     }
 
     @Override
-    public void processElement2(Row currentRow, Context context,
-      Collector<Row> collector) throws Exception {
-      collector.collect(stateJoin(currentRow, 2, context));
+    public void processElement2(Row currentRow, Context context, Collector<Row> collector)
+        throws Exception {
+      final Row jointRow = stateJoin(currentRow, 2, context);
+      if (jointRow != null) {
+        collector.collect(jointRow);
+      }
     }
   }
 
