@@ -47,20 +47,20 @@ public class RowCsvUtils {
     @Override
     public int compare(Row a, Row b) {
       //ORDER BY dt.d_year, sum_agg desc, brand_id
-      int aDYear = (int) a.getField(0);
-      int bDYear = (int) b.getField(0);
+      int aDYear = (int) a.getField(1);
+      int bDYear = (int) b.getField(1);
       if (bDYear != aDYear) {
         return aDYear - bDYear;
       }
 
-      float aSumAgg = (Float) a.getField(3);
-      float bSumAgg = (Float) b.getField(3);
+      float aSumAgg = (Float) a.getField(10);
+      float bSumAgg = (Float) b.getField(10);
       if (bSumAgg != aSumAgg) {
         return bSumAgg > aSumAgg ? 1 : -1;
       }
 
-      int aIBrandId = (int) a.getField(1);
-      int bIBrandId = (int) b.getField(1);
+      int aIBrandId = (int) a.getField(7);
+      int bIBrandId = (int) b.getField(7);
       return aIBrandId - bIBrandId;
     }
   }

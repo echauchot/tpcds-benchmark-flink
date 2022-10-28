@@ -124,7 +124,7 @@ public class Query3ViaFlinkRowDatastream {
       .filter((FilterFunction<Row>) value -> value.getField(3) != null
         && (Integer) value.getField(3) == 128 && value.getField(0) != null);
 
-    // Join1: WHERE dt.d_date_sk = store_sales.ss_sold_date_sk
+    // Join1: WHERE date_dim.d_date_sk = store_sales.ss_sold_date_sk
     final DataStream<Row> recordsJoinDateSk = dateDim
       .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0))
       .connect(storeSales.keyBy(
@@ -141,28 +141,38 @@ public class Query3ViaFlinkRowDatastream {
       .returns(Row.class);
 
     // GROUP BY dt.d_year, item.i_brand, item.i_brand_id
-    final SingleOutputStreamOperator<Row> sum = recordsJoinItemSk
-      .keyBy(compositeKey())
-      // SUM(ss_ext_sales_price) sum_agg
-      .reduce((ReduceFunction<Row>) (row1, row2) -> {
-        {
-          // d_year, brand_id, brand, sum_agg
-          Row output = new Row(4);
-          output.setField(0, row1.getField(1));
-          output.setField(1, row1.getField(7));
-          output.setField(2, row1.getField(8));
-          final Float record1Price = (Float) row1.getField(5);
-          final Float record2Price = (Float) row2.getField(5);
-          if (record1Price != null && record2Price != null) {
-            output.setField(3, record1Price + record2Price);
-          } else if (record1Price == null) {
-            output.setField(3, record2Price);
-          } else {
-            output.setField(3, record1Price);
-          }
-          return output;
-        }
-      }).returns(Row.class);
+    final SingleOutputStreamOperator<Row> sum =
+        recordsJoinItemSk
+            .keyBy(compositeKey())
+            // SUM(ss_ext_sales_price) sum_agg
+            .reduce(
+                (ReduceFunction<Row>)
+                    (row1, row2) -> {
+                      {
+                        Row output = new Row(11);
+                        // need to copy all the fields of one of the input rows (they have the same
+                        // value of fields on the 3 we need in the final ouput) because it is
+                        // incremental reduce we
+                        // cannot reduce the fields to only the onces needed otherwise when the
+                        // resulting row will be merged it will not contain the correct number of
+                        // fields
+                        for (int i = 0; i < row1.getArity(); i++) {
+                          output.setField(i, row1.getField(i));
+                        }
+
+                        final Float record1Price = (Float) row1.getField(5);
+                        final Float record2Price = (Float) row2.getField(5);
+                        if (record1Price != null && record2Price != null) {
+                          output.setField(10, record1Price + record2Price);
+                        } else if (record1Price == null) {
+                          output.setField(10, record2Price);
+                        } else {
+                          output.setField(10, record1Price);
+                        }
+                        return output;
+                      }
+                    })
+            .returns(Row.class);
     // ORDER BY dt.d_year, sum_agg desc, brand_id
     final SingleOutputStreamOperator<Row> output = sum
       .windowAll(GlobalWindows.create())
@@ -187,8 +197,8 @@ public class Query3ViaFlinkRowDatastream {
 
       @Override public void encode(Row row, OutputStream outputStream)
         throws IOException {
-        String output = row.getField(0) + FIELD_DELIMITER + row.getField(1) + FIELD_DELIMITER + row.getField(
-          2) + FIELD_DELIMITER + row.getField(3);
+        String output = row.getField(1) + FIELD_DELIMITER + row.getField(7) + FIELD_DELIMITER + row.getField(
+          8) + FIELD_DELIMITER + row.getField(10);
         outputStream.write(output.getBytes(StandardCharsets.UTF_8));
         outputStream.write(10);
       }
@@ -204,7 +214,7 @@ public class Query3ViaFlinkRowDatastream {
   }
 
   private static KeySelector<Row, String> compositeKey() {
-    return row -> String.valueOf(row.getField(1)) + row.getField(8) + row.getField(7);
+    return row -> String.valueOf(row.getField(1)) + String.valueOf(row.getField(8)) + String.valueOf(row.getField(7));
   }
 
   private static class JoinRows
@@ -233,9 +243,7 @@ public class Query3ViaFlinkRowDatastream {
         myState.put(currentKey, currentRow);
         return null;
       } else { // found a row to join with (same key) so do the join
-        return currentDatastream == 1 ?
-          Row.join(currentRow, otherRow) :
-          Row.join(otherRow, currentRow);
+        return currentDatastream == 1 ? Row.join(currentRow, otherRow) : Row.join(otherRow, currentRow);
       }
     }
 

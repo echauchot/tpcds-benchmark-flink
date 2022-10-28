@@ -143,12 +143,13 @@ public class Query3ViaFlinkRowDataset {
           }
         }
         if (output != null) {
-          // d_year, brand_id, brand, sum_agg
-          Row result = new Row(4);
-          result.setField(0, output.getField(1));
-          result.setField(1, output.getField(7));
-          result.setField(2, output.getField(8));
-          result.setField(3, sumAgg);
+          Row result = new Row(11);
+          // need to copy all the fields of one of the input rows (they have the same
+          // value of fields on the 3 we need in the final ouput)
+          for (int j = 0; j < output.getArity(); j++){
+            result.setField(j, output.getField(j));
+          }
+          result.setField(10, sumAgg);
           collector.collect(result);
         }
       }).returns(Row.class);
@@ -167,8 +168,8 @@ public class Query3ViaFlinkRowDataset {
     output.writeAsFormattedText(pathResults, FileSystem.WriteMode.OVERWRITE, new TextOutputFormat.TextFormatter<Row>() {
 
       @Override public String format(Row row) {
-        return row.getField(0) + FIELD_DELIMITER + row.getField(1) + FIELD_DELIMITER + row.getField(
-          2) + FIELD_DELIMITER + row.getField(3);
+        return row.getField(1) + FIELD_DELIMITER + row.getField(7) + FIELD_DELIMITER + row.getField(
+          8) + FIELD_DELIMITER + row.getField(10);
       }
     });
     LOG.info("TPC-DS Query 3 Flink DataSet - start");
@@ -182,6 +183,6 @@ public class Query3ViaFlinkRowDataset {
   }
 
   private static KeySelector<Row, String> compositeKey() {
-    return row -> String.valueOf(row.getField(1)) + row.getField(8) + row.getField(7);
+    return row -> String.valueOf(row.getField(1)) + String.valueOf(row.getField(8)) + String.valueOf(row.getField(7));
   }
 }
