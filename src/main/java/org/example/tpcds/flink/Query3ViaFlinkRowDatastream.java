@@ -23,6 +23,7 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.RowCsvInputFormat;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -108,7 +109,7 @@ public class Query3ViaFlinkRowDatastream {
     // SELECT ss_sold_date_sk, ss_item_sk, ss_ext_sales_price
     selectedFields = new int[]{0, 2, 15};
     final RowCsvInputFormat storeSalesInputFormat = createInputFormat("store_sales", pathStoreSales, selectedFields);
-    final SingleOutputStreamOperator<Row> storeSales = env.
+    final DataStream<Row> storeSales = env.
       createInput(storeSalesInputFormat)
       .filter(
       // WHERE ss_sold_date_sk != null AND ss_item_sk != null
@@ -118,7 +119,7 @@ public class Query3ViaFlinkRowDatastream {
     // SELECT i_item_sk, i_brand_id, i_brand, i_manufact_id
     selectedFields = new int[]{0, 7, 8, 13};
     final RowCsvInputFormat itemInputFormat = createInputFormat("item", pathItem, selectedFields);
-    final SingleOutputStreamOperator<Row> item = env
+    final DataStream<Row> item = env
       .createInput(itemInputFormat)
       // WHERE item.i_manufact_id = 128 AND i_item_sk != null
       .filter((FilterFunction<Row>) value -> value.getField(3) != null
@@ -173,8 +174,8 @@ public class Query3ViaFlinkRowDatastream {
                     })
             .returns(Row.class);
     // ORDER BY dt.d_year, sum_agg desc, brand_id
-    final SingleOutputStreamOperator<Row> output = sum
-      .windowAll(GlobalWindows.create())
+    final DataStream<Row> output = sum
+      /*.windowAll(GlobalWindows.create())
       .process(new ProcessAllWindowFunction<Row, Row, GlobalWindow>() {
 
         @Override public void process(Context context, Iterable<Row> rows,
@@ -185,13 +186,16 @@ public class Query3ViaFlinkRowDatastream {
           output.forEach(collector::collect);
         }
       }).returns(Row.class)
+      */
       // LIMIT 100
       .keyBy(
         (KeySelector<Row, Integer>) record -> 0)// key is required for stateful count (limit 100 impl), use fake 0 key
       .map(new LimitMapper());
+
+
     // WRITE d_year|i_brand_id|i_brand|sum_agg
-    // parallelism is 1 so it does not mess the order up
-    output.addSink(StreamingFileSink.forRowFormat(new Path(pathResults), new Encoder<Row>() {
+    // parallelism is 1 because of keyBy(0) so it does not mess the order up
+    output.sinkTo(FileSink.forRowFormat(new Path(pathResults), new Encoder<Row>() {
 
       @Override public void encode(Row row, OutputStream outputStream)
         throws IOException {
