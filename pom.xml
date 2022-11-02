@@ -12,7 +12,7 @@
   <properties>
     <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>8</maven.compiler.target>
-    <flink.version>1.15.2</flink.version>
+    <flink.version>1.16.0</flink.version>
     <guava.version>30.1.1-jre-15.0</guava.version>
     <avro.version>1.10.0</avro.version>
     <parquet.version>1.11.1</parquet.version>
