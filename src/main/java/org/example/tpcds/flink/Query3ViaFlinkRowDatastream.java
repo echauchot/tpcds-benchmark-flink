@@ -2,20 +2,24 @@ package org.example.tpcds.flink;
 
 import static org.example.tpcds.flink.CLIUtils.extractParameters;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
-import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.OrderComparator;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.serialization.Encoder;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
@@ -26,18 +30,19 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
-import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
-import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
-import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils;
 
 /*
  SELECT dt.d_year, item.i_brand_id brand_id, item.i_brand brand,SUM(ss_ext_sales_price) sum_agg
@@ -174,24 +179,41 @@ public class Query3ViaFlinkRowDatastream {
                     })
             .returns(Row.class);
     // ORDER BY dt.d_year, sum_agg desc, brand_id
-    final DataStream<Row> output = sum
-      /*.windowAll(GlobalWindows.create())
-      .process(new ProcessAllWindowFunction<Row, Row, GlobalWindow>() {
 
-        @Override public void process(Context context, Iterable<Row> rows,
-          Collector<Row> collector) {
-          List<Row> output = new ArrayList<>();
-          rows.forEach(output::add);
-          output.sort(new OrderComparator());
-          output.forEach(collector::collect);
+    final DataStream<Row> output = sum
+      .keyBy(
+        (KeySelector<Row, Integer>) record -> 0) // this is required for stateful sort, use fake 0 key
+      .process(new KeyedProcessFunction<Integer,Row, Row>() {
+
+        ListState<Row> rows;
+        @Override
+        public void processElement(Row row,
+          KeyedProcessFunction<Integer, Row, Row>.Context context, Collector<Row> collector)
+          throws Exception {
+          rows.add(row);
+          context.timerService().registerProcessingTimeTimer(Long.MAX_VALUE);
         }
-      }).returns(Row.class)
-      */
+
+        @Override
+        public void open(Configuration parameters) {
+          rows = getRuntimeContext().getListState(new ListStateDescriptor<>("rows", Row.class));
+        }
+
+        @Override public void onTimer(long timestamp,
+          KeyedProcessFunction<Integer, Row, Row>.OnTimerContext context, Collector<Row> collector)
+          throws Exception {
+          final Iterable<Row> storedRows = rows.get();
+          ArrayList<Row> sortedRows = Lists.newArrayList(storedRows);
+          sortedRows.sort(new RowCsvUtils.OrderComparator());
+          sortedRows.forEach(collector::collect);
+        }
+
+      })
+
       // LIMIT 100
       .keyBy(
-        (KeySelector<Row, Integer>) record -> 0)// key is required for stateful count (limit 100 impl), use fake 0 key
+        (KeySelector<Row, Integer>) record -> 0)// key is required for stateful count (limit 100 impl)
       .map(new LimitMapper());
-
 
     // WRITE d_year|i_brand_id|i_brand|sum_agg
     // parallelism is 1 because of keyBy(0) so it does not mess the order up
