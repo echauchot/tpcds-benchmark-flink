@@ -8,15 +8,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -35,11 +31,9 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.OutputTag;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils;
@@ -114,8 +108,8 @@ public class Query3ViaFlinkRowDatastream {
     // SELECT ss_sold_date_sk, ss_item_sk, ss_ext_sales_price
     selectedFields = new int[]{0, 2, 15};
     final RowCsvInputFormat storeSalesInputFormat = createInputFormat("store_sales", pathStoreSales, selectedFields);
-    final DataStream<Row> storeSales = env.
-      createInput(storeSalesInputFormat)
+    final DataStream<Row> storeSales = env
+      .createInput(storeSalesInputFormat)
       .filter(
       // WHERE ss_sold_date_sk != null AND ss_item_sk != null
       (FilterFunction<Row>) value -> value.getField(0) != null && value.getField(1) != null);
@@ -147,7 +141,8 @@ public class Query3ViaFlinkRowDatastream {
       .returns(Row.class);
 
     // GROUP BY date_dim.d_year, item.i_brand, item.i_brand_id
-    final DataStream<Row> sum = recordsJoinItemSk
+    final DataStream<Row> sum =
+        recordsJoinItemSk
             .keyBy(compositeKey())
             // SUM(ss_ext_sales_price) sum_agg
             .reduce(
@@ -155,25 +150,16 @@ public class Query3ViaFlinkRowDatastream {
                     (row1, row2) -> {
                       {
                         Row output = new Row(11);
-                        // need to copy all the fields of one of the input rows (they have the same
-                        // value of fields on the 3 we need in the final ouput) because it is
-                        // incremental reduce we
-                        // cannot reduce the fields to only the onces needed otherwise when the
-                        // resulting row will be merged it will not contain the correct number of
-                        // fields
-                        for (int i = 0; i < row1.getArity(); i++) {
+                        // rows are incrementally merged so we can receive one that was already reduced
+                        // (arrity 11) in that case we need to take the aggregated sum.
+                        Float sum1 = row1.getArity() == 11 ? (Float)row1.getField(10) : (Float)row1.getField(5);
+                        Float sum2 = row2.getArity() == 11 ? (Float)row2.getField(10) : (Float)row2.getField(5);
+                        // copy all the fields except the sumAgg
+                        for (int i = 0; i < 10; i++) {
                           output.setField(i, row1.getField(i));
                         }
 
-                        final Float record1Price = (Float) row1.getField(5);
-                        final Float record2Price = (Float) row2.getField(5);
-                        if (record1Price != null && record2Price != null) {
-                          output.setField(10, record1Price + record2Price);
-                        } else if (record1Price == null) {
-                          output.setField(10, record2Price);
-                        } else {
-                          output.setField(10, record1Price);
-                        }
+                        output.setField(10, (sum1 != null ? sum1 : 0.0f) + (sum2 != null ? sum2 : 0.0f));
                         return output;
                       }
                     })
@@ -181,8 +167,7 @@ public class Query3ViaFlinkRowDatastream {
     // ORDER BY dt.d_year, sum_agg desc, brand_id
 
     final DataStream<Row> output = sum
-      .keyBy(
-        (KeySelector<Row, Integer>) record -> 0) // this is required for stateful sort, use fake 0 key
+      .keyBy((KeySelector<Row, Integer>) row -> 0) //key is required for stateful sort
       .process(new KeyedProcessFunction<Integer,Row, Row>() {
 
         ListState<Row> rows;
@@ -212,7 +197,7 @@ public class Query3ViaFlinkRowDatastream {
 
       // LIMIT 100
       .keyBy(
-        (KeySelector<Row, Integer>) record -> 0)// key is required for stateful count (limit 100 impl)
+        (KeySelector<Row, Integer>) record -> 0) //key is required for stateful count (limit 100 impl)
       .map(new LimitMapper());
 
     // WRITE d_year|i_brand_id|i_brand|sum_agg
