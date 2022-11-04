@@ -11,6 +11,7 @@ import java.util.Map;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.JoinFunction;
+import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.RowCsvInputFormat;
@@ -94,7 +95,7 @@ public class Query3ViaFlinkRowDataset {
     // SELECT ss_sold_date_sk, ss_item_sk, ss_ext_sales_price
     selectedFields = new int[]{0, 2, 15};
     final RowCsvInputFormat storeSalesInputFormat = createInputFormat("store_sales", pathStoreSales, selectedFields);
-    final FilterOperator<Row> storeSales = env
+    final DataSet<Row> storeSales = env
       .createInput(storeSalesInputFormat)
       .filter(
       // WHERE ss_sold_date_sk != null AND ss_item_sk != null
@@ -105,7 +106,7 @@ public class Query3ViaFlinkRowDataset {
     // SELECT i_item_sk, i_brand_id, i_brand, i_manufact_id
     selectedFields = new int[]{0, 7, 8, 13};
     final RowCsvInputFormat itemInputFormat = createInputFormat("item", pathItem, selectedFields);
-    final FilterOperator<Row> item = env
+    final DataSet<Row> item = env
       .createInput(itemInputFormat)
       // WHERE item.i_manufact_id = 128 AND i_item_sk != null
       .filter((FilterFunction<Row>) value -> value.getField(3) != null
@@ -146,7 +147,7 @@ public class Query3ViaFlinkRowDataset {
           Row result = new Row(11);
           // need to copy all the fields of one of the input rows (they have the same
           // value of fields on the 3 we need in the final ouput)
-          for (int j = 0; j < output.getArity(); j++){
+          for (int j = 0; j < output.getArity(); j++) {
             result.setField(j, output.getField(j));
           }
           result.setField(10, sumAgg);
