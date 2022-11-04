@@ -154,6 +154,7 @@ public class Query3ViaFlinkRowDataset {
           collector.collect(result);
         }
       }).returns(Row.class);
+
     // ORDER BY dt.d_year, sum_agg desc, brand_id
     final GroupReduceOperator<Row, Row> output = sum
       .reduceGroup((GroupReduceFunction<Row, Row>) (rows, collector) -> {

@@ -164,8 +164,8 @@ public class Query3ViaFlinkRowDatastream {
                       }
                     })
             .returns(Row.class);
-    // ORDER BY dt.d_year, sum_agg desc, brand_id
 
+    // ORDER BY dt.d_year, sum_agg desc, brand_id
     final DataStream<Row> output = sum
       .keyBy((KeySelector<Row, Integer>) row -> 0) //key is required for stateful sort
       .process(new KeyedProcessFunction<Integer,Row, Row>() {
@@ -192,7 +192,6 @@ public class Query3ViaFlinkRowDatastream {
           sortedRows.sort(new RowCsvUtils.OrderComparator());
           sortedRows.forEach(collector::collect);
         }
-
       })
 
       // LIMIT 100
