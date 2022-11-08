@@ -91,7 +91,6 @@ public class Query3ViaFlinkRowDatastream {
       env = StreamExecutionEnvironment.getExecutionEnvironment();
     }
     env.setParallelism(Integer.parseInt(parallelism));
-    env.setRuntimeMode(RuntimeExecutionMode.BATCH);
 
     // Table date_dim
     // SELECT d_date_sk, d_year, d_moy
