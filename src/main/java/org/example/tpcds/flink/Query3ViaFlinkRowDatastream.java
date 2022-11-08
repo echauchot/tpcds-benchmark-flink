@@ -8,18 +8,20 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
-import org.apache.flink.api.common.RuntimeExecutionMode;
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.state.MapState;
-import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.RowCsvInputFormat;
 import org.apache.flink.configuration.Configuration;
@@ -31,7 +33,10 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
+import org.apache.flink.streaming.api.windowing.assigners.WindowAssigner;
+import org.apache.flink.streaming.api.windowing.triggers.EventTimeTrigger;
+import org.apache.flink.streaming.api.windowing.triggers.Trigger;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 import org.apache.logging.log4j.LogManager;
@@ -123,21 +128,21 @@ public class Query3ViaFlinkRowDatastream {
       .filter((FilterFunction<Row>) value -> value.getField(3) != null
         && (Integer) value.getField(3) == 128 && value.getField(0) != null);
 
-    // Join1: WHERE date_dim.d_date_sk = store_sales.ss_sold_date_sk
+    // Join1: WHERE dt.d_date_sk = store_sales.ss_sold_date_sk
     final DataStream<Row> recordsJoinDateSk = dateDim
-      .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0))
-      .connect(storeSales.keyBy(
-        (KeySelector<Row, Integer>) value -> (Integer) value.getField(0)))
-      .process(new JoinRows())
-      .returns(Row.class);
+      .join(storeSales)
+      .where(row -> (int) row.getField(0))
+      .equalTo(row -> (int) row.getField(0))
+      .window(new EndOfStreamWindows())
+      .apply((JoinFunction<Row, Row, Row>) Row::join);
 
     // Join2: WHERE store_sales.ss_item_sk = item.i_item_sk
     final DataStream<Row> recordsJoinItemSk = recordsJoinDateSk
-      .keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(4))
-      .connect(
-        item.keyBy((KeySelector<Row, Integer>) value -> (Integer) value.getField(0)))
-      .process(new JoinRows())
-      .returns(Row.class);
+      .join(item)
+      .where(row -> (int) row.getField(4))
+      .equalTo(row -> (int) row.getField(0))
+      .window(new EndOfStreamWindows())
+      .apply((JoinFunction<Row, Row, Row>) Row::join);
 
     // GROUP BY date_dim.d_year, item.i_brand, item.i_brand_id
     final DataStream<Row> sum =
@@ -224,55 +229,6 @@ public class Query3ViaFlinkRowDatastream {
     return row -> String.valueOf(row.getField(1)) + String.valueOf(row.getField(8)) + String.valueOf(row.getField(7));
   }
 
-  private static class JoinRows
-    extends KeyedCoProcessFunction<Integer, Row, Row, Row> {
-
-    //    The state of Row belonging to dataStream 1
-    private MapState<Integer, Row> state1;
-    //    The state of Row belonging to dataStream 2
-    private MapState<Integer, Row> state2;
-
-    @Override
-    public void open(Configuration parameters) {
-      state1 = getRuntimeContext().getMapState(
-        new MapStateDescriptor<>("rows_dataStream_1", Integer.class, Row.class));
-      state2 = getRuntimeContext().getMapState(
-        new MapStateDescriptor<>("rows_dataStream_2", Integer.class, Row.class));
-    }
-
-    private Row stateJoin(Row currentRow, int currentDatastream, Context context) throws Exception {
-      final Integer currentKey = context.getCurrentKey();
-      MapState<Integer, Row> myState = currentDatastream == 1 ? state1 : state2;
-      MapState<Integer, Row> otherState = currentDatastream == 1 ? state2 : state1;
-      // join with the other datastream by looking into the state of the other datastream
-      final Row otherRow = otherState.get(currentKey);
-      if (otherRow == null) { // did not find a row to join with, store the row for later join
-        myState.put(currentKey, currentRow);
-        return null;
-      } else { // found a row to join with (same key) so do the join
-        return currentDatastream == 1 ? Row.join(currentRow, otherRow) : Row.join(otherRow, currentRow);
-      }
-    }
-
-    @Override
-    public void processElement1(Row currentRow, Context context, Collector<Row> collector)
-        throws Exception {
-      final Row jointRow = stateJoin(currentRow, 1, context);
-      if (jointRow != null) {
-        collector.collect(jointRow);
-      }
-    }
-
-    @Override
-    public void processElement2(Row currentRow, Context context, Collector<Row> collector)
-        throws Exception {
-      final Row jointRow = stateJoin(currentRow, 2, context);
-      if (jointRow != null) {
-        collector.collect(jointRow);
-      }
-    }
-  }
-
   private static class LimitMapper extends RichMapFunction<Row, Row> {
 
     ValueState<Integer> state;
@@ -295,6 +251,44 @@ public class Query3ViaFlinkRowDatastream {
       return row;
     }
   }
+  private static class EndOfStreamWindows extends WindowAssigner<Object, TimeWindow> {
 
+    private static final EndOfStreamWindows INSTANCE = new EndOfStreamWindows();
+
+    private static final TimeWindow TIME_WINDOW_INSTANCE =
+      new TimeWindow(Long.MIN_VALUE, Long.MAX_VALUE);
+
+    private EndOfStreamWindows() {}
+
+    public static EndOfStreamWindows get() {
+      return INSTANCE;
+    }
+
+    @Override
+    public Collection<TimeWindow> assignWindows(
+      Object row, long timestamp, WindowAssigner.WindowAssignerContext context) {
+      return Collections.singletonList(TIME_WINDOW_INSTANCE);
+    }
+
+    @Override
+    public Trigger<Object, TimeWindow> getDefaultTrigger(StreamExecutionEnvironment env) {
+      return EventTimeTrigger.create();
+    }
+
+    @Override public TypeSerializer<TimeWindow> getWindowSerializer(
+      ExecutionConfig executionConfig) {
+      return new TimeWindow.Serializer();
+    }
+
+    @Override
+    public String toString() {
+      return "EndOfStreamWindows()";
+    }
+
+    @Override
+    public boolean isEventTime() {
+      return true;
+    }
+  }
 }
 
