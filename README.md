@@ -13,7 +13,7 @@ You can use the Databricks' forked version of [tpcds-kit](https://github.com/dat
 Copy the 3 generated files to `src/test/resources` in the project directory.
 
 ## Compile
-`mvn clean install`
+`mvn clean package`
 
 ## Run the DataSet example
 Example on a local flink with 4 parallel threads, the output file is _target/query3_dataset.csv_ :
