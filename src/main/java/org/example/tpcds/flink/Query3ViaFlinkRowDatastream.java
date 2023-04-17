@@ -170,38 +170,51 @@ public class Query3ViaFlinkRowDatastream {
             .returns(Row.class);
 
     // ORDER BY dt.d_year, sum_agg desc, brand_id
-    final DataStream<Row> output = sum
-      .keyBy((KeySelector<Row, Integer>) row -> 0) //key is required for stateful sort
-      .process(new KeyedProcessFunction<Integer,Row, Row>() {
+    final DataStream<Row> output =
+        sum.keyBy((KeySelector<Row, Integer>) row -> 0) // key is required for stateful sort
+            .process(
+                new KeyedProcessFunction<Integer, Row, Row>() {
 
-        ListState<Row> rows;
-        @Override
-        public void processElement(Row row,
-          KeyedProcessFunction<Integer, Row, Row>.Context context, Collector<Row> collector)
-          throws Exception {
-          rows.add(row);
-          context.timerService().registerProcessingTimeTimer(Long.MAX_VALUE);
-        }
+                  ListState<Row> rows;
 
-        @Override
-        public void open(Configuration parameters) {
-          rows = getRuntimeContext().getListState(new ListStateDescriptor<>("rows", Row.class));
-        }
+                  @Override
+                  public void processElement(
+                      Row row,
+                      KeyedProcessFunction<Integer, Row, Row>.Context context,
+                      Collector<Row> collector)
+                      throws Exception {
+                    // set (only once) a timer to fire with the end of stream
+                    if (!rows.get().iterator().hasNext()) {
+                      context.timerService().registerEventTimeTimer(Long.MAX_VALUE);
+                    }
+                    rows.add(row);
+                  }
 
-        @Override public void onTimer(long timestamp,
-          KeyedProcessFunction<Integer, Row, Row>.OnTimerContext context, Collector<Row> collector)
-          throws Exception {
-          final Iterable<Row> storedRows = rows.get();
-          ArrayList<Row> sortedRows = Lists.newArrayList(storedRows);
-          sortedRows.sort(new RowCsvUtils.OrderComparator());
-          sortedRows.forEach(collector::collect);
-        }
-      })
+                  @Override
+                  public void open(Configuration parameters) {
+                    rows =
+                        getRuntimeContext()
+                            .getListState(new ListStateDescriptor<>("rows", Row.class));
+                  }
 
-      // LIMIT 100
-      .keyBy(
-        (KeySelector<Row, Integer>) record -> 0) //key is required for stateful count (limit 100 impl)
-      .map(new LimitMapper());
+                  @Override
+                  public void onTimer(
+                      long timestamp,
+                      KeyedProcessFunction<Integer, Row, Row>.OnTimerContext context,
+                      Collector<Row> collector)
+                      throws Exception {
+                    final Iterable<Row> storedRows = rows.get();
+                    ArrayList<Row> sortedRows = Lists.newArrayList(storedRows);
+                    sortedRows.sort(new RowCsvUtils.OrderComparator());
+                    sortedRows.forEach(collector::collect);
+                  }
+                })
+
+            // LIMIT 100
+            .keyBy(
+                (KeySelector<Row, Integer>)
+                    record -> 0) // key is required for stateful count (limit 100 impl)
+            .map(new LimitMapper());
 
     // WRITE d_year|i_brand_id|i_brand|sum_agg
     // parallelism is 1 because of keyBy(0) so it does not mess the order up
