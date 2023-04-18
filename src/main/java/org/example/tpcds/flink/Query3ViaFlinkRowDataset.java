@@ -1,6 +1,7 @@
 package org.example.tpcds.flink;
 
 import static org.example.tpcds.flink.CLIUtils.extractParameters;
+import static org.example.tpcds.flink.TPCDSUtils.compositeKey;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.OrderComparator;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
@@ -182,9 +183,5 @@ public class Query3ViaFlinkRowDataset {
     LOG.info(
       "TPC-DS {} - end - {}m {}s. Total: {}", "Query 3", (runTime / 60), (runTime % 60), runTime);
     System.out.println(String.format("TPC-DS %s - end - %d m %d s. Total: %d", "Query 3 ", (runTime / 60), (runTime % 60), runTime));
-  }
-
-  private static KeySelector<Row, String> compositeKey() {
-    return row -> String.valueOf(row.getField(1)) + String.valueOf(row.getField(8)) + String.valueOf(row.getField(7));
   }
 }

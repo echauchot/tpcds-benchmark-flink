@@ -43,6 +43,7 @@ import java.util.Collections;
 import java.util.Map;
 
 import static org.example.tpcds.flink.CLIUtils.extractParameters;
+import static org.example.tpcds.flink.TPCDSUtils.compositeKey;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
 import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
 
@@ -159,11 +160,11 @@ public class Query3ViaFlinkRowDatastream {
                       {
                         Row output = new Row(11);
                         // rows are incrementally merged so we can receive one that was already reduced
-                        // (arrity 11) in that case we need to take the aggregated sum.
+                        // (arity 11) in that case we need to take the aggregated sum.
                         Float sum1 = row1.getArity() == 11 ? (Float)row1.getField(10) : (Float)row1.getField(5);
                         Float sum2 = row2.getArity() == 11 ? (Float)row2.getField(10) : (Float)row2.getField(5);
                         // copy all the fields except the sumAgg
-                        for (int i = 0; i < 10; i++) {
+                        for (int i = 0; i <= 9; i++) {
                           output.setField(i, row1.getField(i));
                         }
 
@@ -242,10 +243,6 @@ public class Query3ViaFlinkRowDatastream {
     LOG.info(
       "TPC-DS {} - end - {}m {}s. Total: {}", "Query 3", (runTime / 60), (runTime % 60), runTime);
     System.out.println(String.format("TPC-DS %s - end - %d m %d s. Total: %d", "Query 3 ", (runTime / 60), (runTime % 60), runTime));
-  }
-
-  private static KeySelector<Row, String> compositeKey() {
-    return row -> String.valueOf(row.getField(1)) + String.valueOf(row.getField(8)) + String.valueOf(row.getField(7));
   }
 
   private static class LimitMapper extends RichMapFunction<Row, Row> {
