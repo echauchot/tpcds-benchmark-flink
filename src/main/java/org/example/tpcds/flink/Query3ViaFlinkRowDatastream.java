@@ -1,16 +1,5 @@
 package org.example.tpcds.flink;
 
-import static org.example.tpcds.flink.CLIUtils.extractParameters;
-import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
-import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.JoinFunction;
@@ -27,8 +16,6 @@ import org.apache.flink.api.java.io.RowCsvInputFormat;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
-import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -39,9 +26,25 @@ import org.apache.flink.streaming.api.windowing.triggers.Trigger;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
+
+import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+
+import static org.example.tpcds.flink.CLIUtils.extractParameters;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
 
 /*
  SELECT dt.d_year, item.i_brand_id brand_id, item.i_brand brand,SUM(ss_ext_sales_price) sum_agg
@@ -133,7 +136,7 @@ public class Query3ViaFlinkRowDatastream {
       .join(storeSales)
       .where(row -> (int) row.getField(0))
       .equalTo(row -> (int) row.getField(0))
-      .window(new EndOfStreamWindows())
+      .window(EndOfStreamWindows.INSTANCE)
       .apply((JoinFunction<Row, Row, Row>) Row::join);
 
     // Join2: WHERE store_sales.ss_item_sk = item.i_item_sk
@@ -141,7 +144,7 @@ public class Query3ViaFlinkRowDatastream {
       .join(item)
       .where(row -> (int) row.getField(4))
       .equalTo(row -> (int) row.getField(0))
-      .window(new EndOfStreamWindows())
+      .window(EndOfStreamWindows.INSTANCE)
       .apply((JoinFunction<Row, Row, Row>) Row::join);
 
     // GROUP BY date_dim.d_year, item.i_brand, item.i_brand_id
@@ -149,7 +152,8 @@ public class Query3ViaFlinkRowDatastream {
         recordsJoinItemSk
             .keyBy(compositeKey())
             // SUM(ss_ext_sales_price) sum_agg
-            .reduce(
+          .window(EndOfStreamWindows.INSTANCE)
+          .reduce(
                 (ReduceFunction<Row>)
                     (row1, row2) -> {
                       {
@@ -185,7 +189,9 @@ public class Query3ViaFlinkRowDatastream {
                       throws Exception {
                     // set (only once) a timer to fire with the end of stream
                     if (!rows.get().iterator().hasNext()) {
-                      context.timerService().registerEventTimeTimer(Long.MAX_VALUE);
+                      context
+                          .timerService()
+                          .registerEventTimeTimer(EndOfStreamWindows.TIME_WINDOW_INSTANCE.getEnd());
                     }
                     rows.add(row);
                   }
