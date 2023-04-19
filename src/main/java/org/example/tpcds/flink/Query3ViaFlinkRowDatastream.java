@@ -28,8 +28,6 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils;
 
 import java.io.IOException;
@@ -58,8 +56,6 @@ import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createIn
 */
 
 public class Query3ViaFlinkRowDatastream {
-
-  private static final Logger LOG = LogManager.getLogger(Query3ViaFlinkRowDataset.class);
 
   public static void main(String[] args) throws Exception {
     final Map<String, String> parameters = extractParameters(args);
@@ -238,14 +234,13 @@ public class Query3ViaFlinkRowDatastream {
         outputStream.write(10);
       }
     }).build());
-    LOG.info("TPC-DS Query 3 Flink DataStream - start");
+    System.out.println("TPC-DS Query 3 Flink DataStream - start");
     final long start = System.currentTimeMillis();
     env.execute();
     final long end = System.currentTimeMillis();
     final long runTime = (end - start) / 1000;
-    LOG.info(
-      "TPC-DS {} - end - {}m {}s. Total: {}", "Query 3", (runTime / 60), (runTime % 60), runTime);
-    System.out.println(String.format("TPC-DS %s - end - %d m %d s. Total: %d", "Query 3 ", (runTime / 60), (runTime % 60), runTime));
+    System.out.printf(
+      "TPC-DS %s - end - %d m %d s. Total: %d%n", "Query 3 ", (runTime / 60), (runTime % 60), runTime);
   }
 
   private static class EndOfStreamWindows extends WindowAssigner<Object, TimeWindow> {
@@ -256,10 +251,6 @@ public class Query3ViaFlinkRowDatastream {
       new TimeWindow(Long.MIN_VALUE, Long.MAX_VALUE);
 
     private EndOfStreamWindows() {}
-
-    public static EndOfStreamWindows get() {
-      return INSTANCE;
-    }
 
     @Override
     public Collection<TimeWindow> assignWindows(

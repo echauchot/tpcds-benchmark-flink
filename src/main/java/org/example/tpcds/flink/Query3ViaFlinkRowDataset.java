@@ -1,30 +1,29 @@
 package org.example.tpcds.flink;
 
-import static org.example.tpcds.flink.CLIUtils.extractParameters;
-import static org.example.tpcds.flink.TPCDSUtils.compositeKey;
-import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
-import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.OrderComparator;
-import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.RowCsvInputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat;
 import org.apache.flink.api.java.operators.FilterOperator;
 import org.apache.flink.api.java.operators.GroupReduceOperator;
 import org.apache.flink.api.java.operators.JoinOperator;
 import org.apache.flink.core.fs.FileSystem;
-import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.types.Row;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+
+import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.example.tpcds.flink.CLIUtils.extractParameters;
+import static org.example.tpcds.flink.TPCDSUtils.compositeKey;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.FIELD_DELIMITER;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.OrderComparator;
+import static org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils.createInputFormat;
 
 
 /*
@@ -40,8 +39,6 @@ import org.apache.logging.log4j.Logger;
 */
 
 public class Query3ViaFlinkRowDataset {
-
-  private static final Logger LOG = LogManager.getLogger(Query3ViaFlinkRowDataset.class);
 
   public static void main(String[] args) throws Exception {
     final Map<String, String> parameters = extractParameters(args);
@@ -175,13 +172,12 @@ public class Query3ViaFlinkRowDataset {
           8) + FIELD_DELIMITER + row.getField(10);
       }
     });
-    LOG.info("TPC-DS Query 3 Flink DataSet - start");
+    System.out.print("TPC-DS Query 3 Flink DataSet - start");
     final long start = System.currentTimeMillis();
     env.execute();
     final long end = System.currentTimeMillis();
     final long runTime = (end - start) / 1000;
-    LOG.info(
-      "TPC-DS {} - end - {}m {}s. Total: {}", "Query 3", (runTime / 60), (runTime % 60), runTime);
-    System.out.println(String.format("TPC-DS %s - end - %d m %d s. Total: %d", "Query 3 ", (runTime / 60), (runTime % 60), runTime));
+    System.out.printf(
+      "TPC-DS %s - end - %d m %d s. Total: %d%n", "Query 3 ", (runTime / 60), (runTime % 60), runTime);
   }
 }

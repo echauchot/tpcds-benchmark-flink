@@ -12,10 +12,7 @@ package org.example.tpcds.flink;
  LIMIT 100
 */
 
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.flink.core.fs.FileSystem;
-import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
@@ -28,19 +25,22 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.sinks.CsvTableSink;
 import org.apache.flink.table.sources.CsvTableSource;
 import org.apache.flink.table.types.utils.TypeConversions;
+
+import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
+
 import org.example.tpcds.flink.csvSchemas.csvSchemas.TpcdsSchema;
 import org.example.tpcds.flink.csvSchemas.csvSchemas.TpcdsSchemaProvider;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class Query3ViaFlinkSQLCSV {
 
-  private static final Logger LOG = LogManager.getLogger(Query3ViaFlinkSQLCSV.class);
   private static final String COL_DELIMITER = "|";
 
   public static void main(String[] args) throws Exception {
-    LOG.info("This pipeline does not work with globs: https://issues.apache.org/jira/browse/FLINK-6417 , workaround with filter does not work on S3 filesystem and FileInputFormat.setFilePaths is not supported");
+    System.out.print("This pipeline does not work with globs: https://issues.apache.org/jira/browse/FLINK-6417 , workaround with filter does not work on S3 filesystem and FileInputFormat.setFilePaths is not supported");
     final Map<String, String> parameters = extractParameters(args);
 
     final String pathDateDim = parameters.get("--pathDateDim");
@@ -114,7 +114,7 @@ public class Query3ViaFlinkSQLCSV {
           resultTable.getSchema().getFieldDataTypes())
       );
 
-    LOG.info("TPC-DS Query 3 Flink SQL CSV - start");
+    System.out.print("TPC-DS Query 3 Flink SQL CSV - start");
 
     final long start = System.currentTimeMillis();
     TableResult tableResult = resultTable.executeInsert(sinkTableName);
@@ -123,9 +123,8 @@ public class Query3ViaFlinkSQLCSV {
 
     final long end = System.currentTimeMillis();
     final long runTime = (end - start) / 1000;
-    LOG.info(
-      "TPC-DS {} - end - {}m {}s. Total: {}", "Query 3", (runTime / 60), (runTime % 60), runTime);
-    System.out.println(String.format("TPC-DS %s - end - %d m %d s. Total: %d", "Query 3 ", (runTime / 60), (runTime % 60), runTime));
+    System.out.printf(
+      "TPC-DS %s - end - %d m %d s. Total: %d%n", "Query 3 ", (runTime / 60), (runTime % 60), runTime);
   }
 
   private static Map<String, String> extractParameters(String[] args) {
