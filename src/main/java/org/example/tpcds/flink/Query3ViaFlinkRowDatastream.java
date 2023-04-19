@@ -4,12 +4,9 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.RowCsvInputFormat;
@@ -20,6 +17,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.windowing.assigners.WindowAssigner;
 import org.apache.flink.streaming.api.windowing.triggers.EventTimeTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.Trigger;
@@ -179,7 +177,6 @@ public class Query3ViaFlinkRowDatastream {
         sum.keyBy((KeySelector<Row, Integer>) row -> 0) // key is required for stateful sort
             .process(
                 new KeyedProcessFunction<Integer, Row, Row>() {
-
                   ListState<Row> rows;
 
                   @Override
@@ -218,10 +215,16 @@ public class Query3ViaFlinkRowDatastream {
                 })
 
             // LIMIT 100
-            .keyBy(
-                (KeySelector<Row, Integer>)
-                    record -> 0) // key is required for stateful count (limit 100 impl)
-            .map(new LimitMapper());
+          .process(new ProcessFunction<Row, Row>() {
+            private int count = 0;
+            @Override public void processElement(Row row, ProcessFunction<Row, Row>.Context ctx,
+              Collector<Row> out) throws Exception {
+              if (count <= 100) {
+                out.collect(row);
+              }
+              count++;
+            }
+          });
 
     // WRITE d_year|i_brand_id|i_brand|sum_agg
     // parallelism is 1 because of keyBy(0) so it does not mess the order up
@@ -245,28 +248,6 @@ public class Query3ViaFlinkRowDatastream {
     System.out.println(String.format("TPC-DS %s - end - %d m %d s. Total: %d", "Query 3 ", (runTime / 60), (runTime % 60), runTime));
   }
 
-  private static class LimitMapper extends RichMapFunction<Row, Row> {
-
-    ValueState<Integer> state;
-
-    @Override
-    public void open(Configuration parameters) {
-      state = getRuntimeContext().getState(new ValueStateDescriptor<>("countState", Integer.class));
-    }
-
-    @Override
-    public Row map(Row row) throws Exception {
-      Integer count = state.value();
-      if (count == null){
-        count = 0;
-      }
-      state.update(++count);
-      if (count > 100){
-        close();
-      }
-      return row;
-    }
-  }
   private static class EndOfStreamWindows extends WindowAssigner<Object, TimeWindow> {
 
     private static final EndOfStreamWindows INSTANCE = new EndOfStreamWindows();
