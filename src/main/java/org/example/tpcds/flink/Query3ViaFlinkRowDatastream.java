@@ -131,7 +131,7 @@ public class Query3ViaFlinkRowDatastream {
       .join(storeSales)
       .where(row -> (int) row.getField(0))
       .equalTo(row -> (int) row.getField(0))
-      .window(EndOfStreamWindows.INSTANCE)
+      .window(EndOfStreamWindow.INSTANCE)
       .apply((JoinFunction<Row, Row, Row>) Row::join);
 
     // Join2: WHERE store_sales.ss_item_sk = item.i_item_sk
@@ -139,7 +139,7 @@ public class Query3ViaFlinkRowDatastream {
       .join(item)
       .where(row -> (int) row.getField(4))
       .equalTo(row -> (int) row.getField(0))
-      .window(EndOfStreamWindows.INSTANCE)
+      .window(EndOfStreamWindow.INSTANCE)
       .apply((JoinFunction<Row, Row, Row>) Row::join);
 
     // GROUP BY date_dim.d_year, item.i_brand, item.i_brand_id
@@ -147,7 +147,7 @@ public class Query3ViaFlinkRowDatastream {
         recordsJoinItemSk
             .keyBy(compositeKey())
             // SUM(ss_ext_sales_price) sum_agg
-          .window(EndOfStreamWindows.INSTANCE)
+          .window(EndOfStreamWindow.INSTANCE)
           .reduce(
                 (ReduceFunction<Row>)
                     (row1, row2) -> {
@@ -185,7 +185,7 @@ public class Query3ViaFlinkRowDatastream {
                     if (!rows.get().iterator().hasNext()) {
                       context
                           .timerService()
-                          .registerEventTimeTimer(EndOfStreamWindows.TIME_WINDOW_INSTANCE.getEnd());
+                          .registerEventTimeTimer(EndOfStreamWindow.TIME_WINDOW_INSTANCE.getEnd());
                     }
                     rows.add(row);
                   }
@@ -243,14 +243,14 @@ public class Query3ViaFlinkRowDatastream {
       "TPC-DS %s - end - %d m %d s. Total: %d%n", "Query 3 ", (runTime / 60), (runTime % 60), runTime);
   }
 
-  private static class EndOfStreamWindows extends WindowAssigner<Object, TimeWindow> {
+  private static class EndOfStreamWindow extends WindowAssigner<Object, TimeWindow> {
 
-    private static final EndOfStreamWindows INSTANCE = new EndOfStreamWindows();
+    private static final EndOfStreamWindow INSTANCE = new EndOfStreamWindow();
 
     private static final TimeWindow TIME_WINDOW_INSTANCE =
       new TimeWindow(Long.MIN_VALUE, Long.MAX_VALUE);
 
-    private EndOfStreamWindows() {}
+    private EndOfStreamWindow() {}
 
     @Override
     public Collection<TimeWindow> assignWindows(
@@ -270,7 +270,7 @@ public class Query3ViaFlinkRowDatastream {
 
     @Override
     public String toString() {
-      return "EndOfStreamWindows()";
+      return "EndOfStreamWindow()";
     }
 
     @Override
