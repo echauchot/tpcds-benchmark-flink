@@ -12,8 +12,8 @@
   <properties>
     <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>8</maven.compiler.target>
-    <flink.version>1.16.0</flink.version>
-    <guava.version>30.1.1-jre-15.0</guava.version>
+    <flink.version>1.18-SNAPSHOT</flink.version>
+    <guava.version>31.1-jre-17.0</guava.version>
     <avro.version>1.10.0</avro.version>
     <parquet.version>1.11.1</parquet.version>
     <hadoop.version>2.8.5</hadoop.version>

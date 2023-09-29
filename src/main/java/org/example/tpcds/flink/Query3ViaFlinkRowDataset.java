@@ -13,7 +13,7 @@ import org.apache.flink.api.java.operators.JoinOperator;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.types.Row;
 
-import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
+import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 
 import java.util.ArrayList;
 import java.util.List;

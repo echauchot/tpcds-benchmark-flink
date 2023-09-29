@@ -25,8 +25,8 @@ import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 
-import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
-import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import org.example.tpcds.flink.csvSchemas.csvSchemas.RowCsvUtils;
 
