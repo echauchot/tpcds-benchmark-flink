@@ -26,4 +26,4 @@ Example on a local flink with 4 parallel threads, the output directoy is _target
 
 ## Run the SQL example
 Example on a local flink with 4 parallel threads, the output file is _target/query3_sql.csv_ :
-`java -cp "target/*"  org.example.tpcds.flink.Query3ViaFlinkSQLCSV --pathDateDim="src/test/resources/date_dim.dat" --pathStoreSales="src/test/resources/store_sales.dat" --pathItem="src/test/resources/item.dat" --pathResults="target/query3_sql.csv" --flinkMaster="[local]" --parallelism=4`
+`java -cp "target/*"  org.example.tpcds.flink.Query3ViaFlinkSQL --pathDateDim="src/test/resources/date_dim.dat" --pathStoreSales="src/test/resources/store_sales.dat" --pathItem="src/test/resources/item.dat" --pathResults="target/query3_sql.csv" --flinkMaster="[local]" --parallelism=4`

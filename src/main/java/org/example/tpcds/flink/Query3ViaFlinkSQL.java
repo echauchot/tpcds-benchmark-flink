@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-public class Query3ViaFlinkSQLCSV {
+public class Query3ViaFlinkSQL {
 
   private static final String COL_DELIMITER = "|";
 
